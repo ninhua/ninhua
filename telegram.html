@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>Telegram配置编辑器</title>
+    <style>
+        :root {
+            --primary: #007bff;
+            --secondary: #6c757d;
+            --success: #28a745;
+            --danger: #dc3545;
+        }
+        body { font-family: system-ui, sans-serif; max-width: 800px; margin: 2rem auto; padding: 0 1rem; }
+        .upload-section { border: 2px dashed var(--primary); padding: 2rem; text-align: center; margin-bottom: 2rem; }
+        .config-section { border: 1px solid #dee2e6; border-radius: 0.25rem; padding: 1rem; margin-bottom: 1rem; }
+        .item-card { background: #f8f9fa; padding: 1rem; margin-bottom: 1rem; border-radius: 0.25rem; }
+        button { padding: 0.375rem 0.75rem; border-radius: 0.25rem; }
+        .btn-primary { background: var(--primary); color: white; border: none; }
+        .btn-danger { background: var(--danger); color: white; border: none; }
+        .switch { position: relative; display: inline-block; width: 3rem; height: 1.5rem; }
+        .switch input { opacity: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background: #ced4da; transition: .4s; border-radius: 1.5rem; }
+        .slider:before { position: absolute; content: ""; height: 1.1rem; width: 1.1rem; left: 0.2rem; bottom: 0.2rem; background: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background: var(--primary); }
+        input:checked + .slider:before { transform: translateX(1.5rem); }
+    </style>
+</head>
+<body>
+    <h1>📝 Telegram配置编辑器</h1>
+    
+    <div class="upload-section">
+        <button class="btn-primary" onclick="loadDefaultConfig()">加载默认配置</button>
+        <p>或</p>
+        <input type="file" id="fileInput" accept=".json" hidden>
+        <button class="btn-primary" onclick="document.getElementById('fileInput').click()">上传配置文件</button>
+    </div>
+
+    <div class="config-section">
+        <h2>账号配置 <button class="btn-primary" onclick="addAccount()">+ 添加</button></h2>
+        <div id="accounts"></div>
+    </div>
+
+    <div class="config-section">
+        <h2>机器人配置 <button class="btn-primary" onclick="addBot()">+ 添加</button></h2>
+        <div id="bots"></div>
+    </div>
+
+    <div style="text-align: center; margin-top: 2rem;">
+        <button class="btn-primary" onclick="downloadConfig()" style="padding: 1rem 2rem;">💾 下载config.json</button>
+    </div>
+
+<script>
+// 初始化配置
+let currentConfig = { accounts: [], bots: [] };
+
+// 页面加载时尝试读取默认配置
+window.addEventListener('DOMContentLoaded', async () => {
+    try {
+        const response = await fetch('config.json');
+        if(response.ok) {
+            const config = await response.json();
+            loadConfig(config);
+        }
+    } catch(e) {
+        console.log('使用空白配置初始化');
+        addAccount();
+        addBot();
+    }
+});
+
+// 配置加载函数
+function loadConfig(config) {
+    // 清空现有配置
+    document.getElementById('accounts').innerHTML = '';
+    document.getElementById('bots').innerHTML = '';
+
+    // 加载账号
+    config.accounts.forEach(account => {
+        const item = addAccount();
+        item.querySelector('.api-id').value = account.api_id || '';
+        item.querySelector('.api-hash').value = account.api_hash || '';
+    });
+
+    // 加载机器人
+    config.bots.forEach(bot => {
+        const item = addBot();
+        item.querySelector('.bot-id').value = bot.bot_id || '';
+        item.querySelector('.bot-msg').value = bot.message || '';
+        item.querySelector('.enable').checked = bot.enable !== false;
+        item.querySelector('.click-button').checked = !!bot.click_button;
+        item.querySelector('.button-data').value = bot.button_data || '';
+        toggleButtonOptions(item);
+    });
+}
+
+// 文件上传处理
+document.getElementById('fileInput').addEventListener('change', async e => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    try {
+        const config = JSON.parse(await file.text());
+        loadConfig(config);
+    } catch(e) {
+        alert('配置文件解析失败: ' + e.message);
+    }
+});
+
+// 动态添加配置项
+function addAccount() {
+    const div = document.createElement('div');
+    div.className = 'item-card';
+    div.innerHTML = `
+        <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 1rem; align-items: center">
+            <input type="number" placeholder="API ID" class="api-id" required>
+            <input type="text" placeholder="API Hash" class="api-hash" required>
+            <button class="btn-danger" onclick="this.parentElement.parentElement.remove()">删除</button>
+        </div>
+    `;
+    document.getElementById('accounts').appendChild(div);
+    return div;
+}
+
+function addBot() {
+    const div = document.createElement('div');
+    div.className = 'item-card';
+    div.innerHTML = `
+        <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 1rem; align-items: center">
+            <input type="text" placeholder="机器人ID" class="bot-id" required>
+            <input type="text" placeholder="签到命令" class="bot-msg" required>
+            <button class="btn-danger" onclick="this.parentElement.parentElement.remove()">删除</button>
+        </div>
+        <div style="margin-top: 1rem">
+            <label style="display: flex; gap: 0.5rem; align-items: center">
+                <span>启用：</span>
+                <label class="switch">
+                    <input type="checkbox" class="enable" checked>
+                    <span class="slider"></span>
+                </label>
+            </label>
+            
+            <div style="margin-top: 0.5rem">
+                <label style="display: flex; gap: 0.5rem; align-items: center">
+                    <span>需要点击按钮：</span>
+                    <label class="switch">
+                        <input type="checkbox" class="click-button">
+                        <span class="slider"></span>
+                    </label>
+                </label>
+                <input type="text" placeholder="按钮数据" class="button-data" style="margin-top: 0.5rem; width: 100%; display: none">
+            </div>
+        </div>
+    `;
+
+    // 事件绑定
+    div.querySelector('.click-button').addEventListener('change', function() {
+        div.querySelector('.button-data').style.display = this.checked ? 'block' : 'none';
+    });
+
+    document.getElementById('bots').appendChild(div);
+    return div;
+}
+
+// 生成下载文件
+function downloadConfig() {
+    const config = {
+        accounts: [...document.querySelectorAll('.item-card')].filter(el => el.closest('#accounts'))
+            .map(item => ({
+                api_id: Number(item.querySelector('.api-id').value),
+                api_hash: item.querySelector('.api-hash').value
+            })),
+        bots: [...document.querySelectorAll('.item-card')].filter(el => el.closest('#bots'))
+            .map(item => ({
+                bot_id: item.querySelector('.bot-id').value,
+                message: item.querySelector('.bot-msg').value,
+                enable: item.querySelector('.enable').checked,
+                click_button: item.querySelector('.click-button').checked,
+                button_data: item.querySelector('.click-button').checked 
+                    ? item.querySelector('.button-data').value 
+                    : undefined
+            }))
+    };
+
+    // 验证配置
+    if (!validateConfig(config)) {
+        alert('请填写所有必填字段');
+        return;
+    }
+
+    // 创建下载
+    const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'config.json';
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+// 配置验证
+function validateConfig(config) {
+    return config.accounts.every(a => a.api_id && a.api_hash) &&
+           config.bots.every(b => b.bot_id && b.message && 
+               (!b.click_button || b.button_data));
+}
+
+// 辅助函数
+function toggleButtonOptions(item) {
+    const clickButton = item.querySelector('.click-button');
+    item.querySelector('.button-data').style.display = clickButton.checked ? 'block' : 'none';
+}
+
+async function loadDefaultConfig() {
+    try {
+        const response = await fetch('config.json');
+        const config = await response.json();
+        loadConfig(config);
+    } catch(e) {
+        alert('默认配置文件加载失败');
+    }
+}
+</script>
+</body>
+</html>
