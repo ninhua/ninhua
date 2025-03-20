@@ -1,1 +1,1 @@
-[网页]("[网页](https://ninhua.github.io/ninhua/))
+[跳转](https://ninhua.github.io/ninhua/)
