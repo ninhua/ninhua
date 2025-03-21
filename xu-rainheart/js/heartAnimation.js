@@ -217,7 +217,7 @@ function startHeartAnimation(canvasId, settings = {}) {
 
     // 计算爱心中心位置
     const centerX = canvas.width / 2;
-    const centerY = canvas.height / 2.5;
+    const centerY = canvas.height / 2;
 
     // 绘制文字
     context.fillText(text, centerX, centerY);
